@@ -1,27 +1,118 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardBody, Badge, Spinner, Button } from '../../components/ui';
 import ComplianceCharts from '../../components/charts/ComplianceCharts';
-import { dashboardMetrics, domainCompliance, recentActivity } from '../../utils/mockData';
-import type { ActivityItem, ComplianceMetric } from '../../utils/mockData';
+import { reportService } from '../../services/reportService';
+import type { ActivityItem, ComplianceMetric, DomainCompliance } from '../../utils/mockData';
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<ComplianceMetric[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [domainData, setDomainData] = useState<DomainCompliance[]>([]);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const navigate = useNavigate();
 
-  // Simulate data loading
+  // Load dashboard data from service
   useEffect(() => {
-    const loadDashboardData = async () => {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setMetrics(dashboardMetrics);
-      setActivities(recentActivity);
-      setIsLoading(false);
-    };
-
     loadDashboardData();
   }, []);
+
+  // Auto-clear notifications after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      const summary = await reportService.getDashboardSummary();
+      
+      setMetrics(summary.metrics);
+      setActivities(summary.recentActivity);
+      setDomainData(summary.domainCompliance);
+    } catch {
+      setNotification({
+        message: 'Failed to load dashboard data. Please try again.',
+        type: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      setIsGeneratingReport(true);
+      const result = await reportService.generateReport({
+        type: 'summary',
+        format: 'pdf',
+        includeCharts: true
+      });
+      
+      setNotification({
+        message: result.message,
+        type: 'success'
+      });
+      
+      if (result.downloadUrl) {
+        window.open(result.downloadUrl, '_blank');
+      } else {
+        navigate('/reports');
+      }
+    } catch {
+      setNotification({
+        message: 'Failed to generate report. Please try again.',
+        type: 'error'
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleRefreshData = async () => {
+    try {
+      setIsRefreshing(true);
+      await loadDashboardData();
+      setNotification({
+        message: 'Dashboard data refreshed successfully',
+        type: 'success'
+      });
+    } catch {
+      setNotification({
+        message: 'Failed to refresh data. Please try again.',
+        type: 'error'
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'upload-policy':
+        navigate('/policies/upload');
+        break;
+      case 'view-controls':
+        navigate('/controls');
+        break;
+      case 'generate-report':
+        handleGenerateReport();
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      default:
+        break;
+    }
+  };
 
   const getActivityIcon = (type: ActivityItem['type']) => {
     const icons = {
@@ -52,6 +143,25 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fadeIn">
+      {/* Notification */}
+      {notification && (
+        <div className={`p-4 rounded-md ${
+          notification.type === 'success' 
+            ? 'bg-green-50 text-green-700 border border-green-200' 
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Dashboard Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -64,6 +174,9 @@ const Dashboard: React.FC = () => {
           <Button 
             variant="outline" 
             size="sm"
+            onClick={handleGenerateReport}
+            isLoading={isGeneratingReport}
+            disabled={isGeneratingReport || isRefreshing}
             className="transform transition-transform hover:scale-105"
           >
             📊 Generate Report
@@ -71,6 +184,9 @@ const Dashboard: React.FC = () => {
           <Button 
             variant="primary" 
             size="sm"
+            onClick={handleRefreshData}
+            isLoading={isRefreshing}
+            disabled={isRefreshing || isGeneratingReport}
             className="transform transition-transform hover:scale-105"
           >
             🔄 Refresh Data
@@ -112,7 +228,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Compliance Chart */}
         <div className="lg:col-span-2">
-          <ComplianceCharts data={domainCompliance} />
+          <ComplianceCharts data={domainData} />
         </div>
 
         {/* Recent Activity */}
@@ -176,37 +292,57 @@ const Dashboard: React.FC = () => {
           <h2 className="text-xl font-semibold text-gray-900">Quick Actions</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1">
-            <CardBody className="text-center p-6">
-              <div className="text-2xl mb-2">📋</div>
-              <div className="text-sm font-medium text-gray-900">Upload Policy</div>
-              <div className="text-xs text-gray-500 mt-1">Add new compliance document</div>
-            </CardBody>
-          </Card>
+          <div
+            className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1"
+            onClick={() => handleQuickAction('upload-policy')}
+          >
+            <Card>
+              <CardBody className="text-center p-6">
+                <div className="text-2xl mb-2">📋</div>
+                <div className="text-sm font-medium text-gray-900">Upload Policy</div>
+                <div className="text-xs text-gray-500 mt-1">Add new compliance document</div>
+              </CardBody>
+            </Card>
+          </div>
           
-          <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1">
-            <CardBody className="text-center p-6">
-              <div className="text-2xl mb-2">🛡️</div>
-              <div className="text-sm font-medium text-gray-900">View Controls</div>
-              <div className="text-xs text-gray-500 mt-1">Manage SOC2 controls</div>
-            </CardBody>
-          </Card>
+          <div
+            className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1"
+            onClick={() => handleQuickAction('view-controls')}
+          >
+            <Card>
+              <CardBody className="text-center p-6">
+                <div className="text-2xl mb-2">🛡️</div>
+                <div className="text-sm font-medium text-gray-900">View Controls</div>
+                <div className="text-xs text-gray-500 mt-1">Manage SOC2 controls</div>
+              </CardBody>
+            </Card>
+          </div>
           
-          <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1">
-            <CardBody className="text-center p-6">
-              <div className="text-2xl mb-2">📊</div>
-              <div className="text-sm font-medium text-gray-900">Generate Report</div>
-              <div className="text-xs text-gray-500 mt-1">Export compliance data</div>
-            </CardBody>
-          </Card>
+          <div
+            className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1"
+            onClick={() => handleQuickAction('generate-report')}
+          >
+            <Card>
+              <CardBody className="text-center p-6">
+                <div className="text-2xl mb-2">📊</div>
+                <div className="text-sm font-medium text-gray-900">Generate Report</div>
+                <div className="text-xs text-gray-500 mt-1">Export compliance data</div>
+              </CardBody>
+            </Card>
+          </div>
           
-          <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1">
-            <CardBody className="text-center p-6">
-              <div className="text-2xl mb-2">⚙️</div>
-              <div className="text-sm font-medium text-gray-900">Settings</div>
-              <div className="text-xs text-gray-500 mt-1">Configure workspace</div>
-            </CardBody>
-          </Card>
+          <div
+            className="hover:shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-1"
+            onClick={() => handleQuickAction('settings')}
+          >
+            <Card>
+              <CardBody className="text-center p-6">
+                <div className="text-2xl mb-2">⚙️</div>
+                <div className="text-sm font-medium text-gray-900">Settings</div>
+                <div className="text-xs text-gray-500 mt-1">Configure workspace</div>
+              </CardBody>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

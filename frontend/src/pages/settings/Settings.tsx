@@ -67,13 +67,16 @@ export default function SettingsPage() {
   ];
 
   const handleSettingChange = (category: string, key: string, value: string | boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category as keyof typeof prev],
-        [key]: value
-      }
-    }));
+    setSettings(prev => {
+      const categorySettings = prev[category as keyof typeof prev] as Record<string, string | boolean>;
+      return {
+        ...prev,
+        [category]: {
+          ...categorySettings,
+          [key]: value
+        }
+      };
+    });
   };
 
   const renderGeneralTab = () => (

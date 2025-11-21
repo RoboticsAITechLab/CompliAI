@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardBody, Button, Input, Badge, Spinner } from '../../components/ui';
-import { policies } from '../../utils/mockData';
+import { policyService } from '../../services/policyService';
 import type { Policy } from '../../utils/mockData';
 
 const PolicyList: React.FC = () => {
@@ -9,18 +9,52 @@ const PolicyList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStandard, setFilterStandard] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingPolicyId, setLoadingPolicyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
 
-  // Simulate data loading
+  // Load policies from service
   useEffect(() => {
-    const loadPolicies = async () => {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setPolicyList(policies);
-      setIsLoading(false);
-    };
-    
     loadPolicies();
   }, []);
+
+  // Auto-clear notifications after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  const loadPolicies = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const filters = {
+        search: searchTerm || undefined,
+        standard: filterStandard !== 'all' ? filterStandard : undefined
+      };
+      const policies = await policyService.getPolicies(filters);
+      setPolicyList(policies);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load policies');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Reload policies when filters change (debounced)
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (!isLoading) {
+        loadPolicies();
+      }
+    }, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm, filterStandard]);
 
   // Filter policies using useMemo to avoid cascading renders
   const filteredPolicies = useMemo(() => {
@@ -50,14 +84,48 @@ const PolicyList: React.FC = () => {
     }
   };
 
-  const handleViewPolicy = (policyId: string) => {
-    // TODO: Navigate to policy detail view
-    console.log('View policy:', policyId);
+  const handleViewPolicy = async (policyId: string) => {
+    try {
+      setLoadingPolicyId(policyId);
+      const policy = await policyService.getPolicyById(policyId);
+      // For now, navigate to a policy detail page (placeholder)
+      navigate(`/policies/${policyId}`, { state: { policy } });
+    } catch (err: any) {
+      setNotification({
+        message: err.message || 'Failed to load policy details',
+        type: 'error'
+      });
+    } finally {
+      setLoadingPolicyId(null);
+    }
   };
 
-  const handleAnalyzePolicy = (policyId: string) => {
-    // TODO: Start policy analysis
-    console.log('Analyze policy:', policyId);
+  const handleAnalyzePolicy = async (policyId: string) => {
+    try {
+      setLoadingPolicyId(policyId);
+      const result = await policyService.analyzePolicy(policyId);
+      setNotification({
+        message: result.message,
+        type: 'success'
+      });
+      // Update the policy status in the list
+      setPolicyList(prev => prev.map(policy => 
+        policy.id === policyId 
+          ? { ...policy, status: 'processing' }
+          : policy
+      ));
+    } catch (err: any) {
+      setNotification({
+        message: err.message || 'Failed to start policy analysis',
+        type: 'error'
+      });
+    } finally {
+      setLoadingPolicyId(null);
+    }
+  };
+
+  const handleRefreshPolicies = () => {
+    loadPolicies();
   };
 
   const formatDate = (dateString: string) => {
@@ -68,9 +136,10 @@ const PolicyList: React.FC = () => {
     });
   };
 
-  const standards = ['all', ...new Set(policies.map(p => p.standard))];
+  // Get unique standards for filter dropdown
+  const standards = ['all', ...new Set(policyList.map((p: Policy) => p.standard))] as string[];
 
-  if (isLoading) {
+  if (isLoading && policyList.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <Spinner size="lg" text="Loading policies..." centered />
@@ -80,6 +149,43 @@ const PolicyList: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Notification */}
+      {notification && (
+        <div className={`p-4 rounded-md ${
+          notification.type === 'success' 
+            ? 'bg-green-50 text-green-700 border border-green-200' 
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-red-800">Error Loading Policies</h3>
+              <p className="text-red-600 mt-1">{error}</p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={handleRefreshPolicies}
+              isLoading={isLoading}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -88,13 +194,24 @@ const PolicyList: React.FC = () => {
             Manage and analyze your compliance policies
           </p>
         </div>
-        <Button 
-          variant="primary" 
-          onClick={() => navigate('/policies/upload')}
-          className="transform transition-transform hover:scale-105"
-        >
-          📤 Upload New Policy
-        </Button>
+        <div className="flex items-center space-x-3">
+          <Button 
+            variant="outline" 
+            onClick={handleRefreshPolicies}
+            isLoading={isLoading}
+            disabled={isLoading}
+            className="transform transition-transform hover:scale-105"
+          >
+            🔄 Refresh
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={() => navigate('/policies/upload')}
+            className="transform transition-transform hover:scale-105"
+          >
+            📤 Upload New Policy
+          </Button>
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -187,10 +304,9 @@ const PolicyList: React.FC = () => {
                       {policy.complianceScore ? (
                         <div className="flex items-center space-x-2">
                           <div className="flex-1 bg-gray-200 rounded-full h-2 w-16">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            <div
+                              className={`bg-blue-600 h-2 rounded-full transition-all duration-300 w-[${policy.complianceScore}%]`}
                               data-percentage={policy.complianceScore}
-                              style={{ width: `${policy.complianceScore}%` }}
                             />
                           </div>
                           <span className="text-sm font-medium text-gray-900">
@@ -207,6 +323,8 @@ const PolicyList: React.FC = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewPolicy(policy.id)}
+                          isLoading={loadingPolicyId === policy.id && loadingPolicyId !== null}
+                          disabled={loadingPolicyId !== null}
                         >
                           View
                         </Button>
@@ -214,9 +332,10 @@ const PolicyList: React.FC = () => {
                           variant="primary"
                           size="sm"
                           onClick={() => handleAnalyzePolicy(policy.id)}
-                          disabled={policy.status === 'processing'}
+                          isLoading={loadingPolicyId === policy.id && loadingPolicyId !== null}
+                          disabled={policy.status === 'processing' || loadingPolicyId !== null}
                         >
-                          Analyze
+                          {policy.status === 'processing' ? 'Processing...' : 'Analyze'}
                         </Button>
                       </div>
                     </td>

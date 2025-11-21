@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Badge from '../../components/ui/Badge';
 import { controls } from '../../utils/mockData';
-import type { Control } from '../../utils/mockData';
+// Control type is imported in mockData where it's used
 
 export default function ControlsPage() {
   const [searchTerm, setSearchTerm] = useState('');

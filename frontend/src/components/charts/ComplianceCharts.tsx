@@ -34,7 +34,7 @@ const ComplianceCharts: React.FC<ComplianceChartsProps> = ({ data, className = '
               </div>
               <div className="relative">
                 <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div
+                    <div
                     className={`h-full rounded-full transition-all duration-1000 ease-out`}
                     style={{
                       width: `${domain.percentage}%`,

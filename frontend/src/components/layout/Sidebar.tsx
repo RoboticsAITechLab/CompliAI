@@ -27,6 +27,11 @@ const Sidebar: React.FC = () => {
       icon: '▸'
     },
     {
+      path: '/billing',
+      label: 'Billing',
+      icon: '💳'
+    },
+    {
       path: '/settings',
       label: 'Settings',
       icon: '▸'
@@ -76,7 +81,7 @@ const Sidebar: React.FC = () => {
       {/* Footer */}
       <div className="p-4 border-t border-gray-200">
         <p className="text-xs text-gray-500 text-center">
-          © 2024 CompliAI
+          © {new Date().getFullYear()} CompliAI
         </p>
       </div>
     </aside>

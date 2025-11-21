@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Input, Card } from '../../components/ui';
+import { authService } from '../../services/authService';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -25,17 +26,13 @@ const ForgotPassword: React.FC = () => {
     setError('');
     
     try {
-      // TODO: Replace with actual forgot password service call
-      console.log('Forgot password request for:', email);
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await authService.requestPasswordReset(email);
       setIsSubmitted(true);
       
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Forgot password failed:', error);
-      setError('Failed to send reset email. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send reset email. Please try again.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +138,7 @@ const ForgotPassword: React.FC = () => {
       {/* Footer */}
       <div className="mt-8 text-center">
         <p className="text-xs text-gray-500">
-          © 2024 CompliAI. All rights reserved.
+          © {new Date().getFullYear()} CompliAI. All rights reserved.
         </p>
       </div>
     </div>

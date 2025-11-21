@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import Footer from './Footer';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -23,6 +24,9 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
             {children}
           </div>
         </main>
+        
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );

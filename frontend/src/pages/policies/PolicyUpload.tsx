@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
 import Badge from '../../components/ui/Badge';
+import { policyService } from '../../services/policyService';
 
 interface UploadedFile {
   id: string;
@@ -35,7 +37,10 @@ function PolicyUpload() {
     effectiveDate: '',
     reviewCycle: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -121,42 +126,103 @@ function PolicyUpload() {
     setMetadata(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate required fields
     if (!metadata.title || !metadata.category || uploadedFiles.length === 0) {
-      alert('Please fill in required fields and upload at least one file.');
+      setNotification({
+        message: 'Please fill in required fields and upload at least one file.',
+        type: 'error'
+      });
       return;
     }
 
-    // Simulate policy creation
-    console.log('Creating policy with metadata:', metadata);
-    console.log('Uploaded files:', uploadedFiles);
-    
-    // Reset form
-    setMetadata({
-      title: '',
-      description: '',
-      category: '',
-      complianceFramework: '',
-      effectiveDate: '',
-      reviewCycle: '',
-    });
-    setUploadedFiles([]);
-    
-    alert('Policy uploaded successfully!');
+    // Get the first uploaded file that is complete
+    const completedFile = uploadedFiles.find(file => file.status === 'complete');
+    if (!completedFile) {
+      setNotification({
+        message: 'Please wait for file upload to complete before submitting.',
+        type: 'error'
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      // Create a mock File object for the service (in real implementation, keep original file reference)
+      const mockFile = new File([''], completedFile.name, { type: completedFile.type });
+      
+      const result = await policyService.uploadPolicy({
+        title: metadata.title,
+        description: metadata.description,
+        category: metadata.category,
+        complianceFramework: metadata.complianceFramework,
+        effectiveDate: metadata.effectiveDate,
+        reviewCycle: metadata.reviewCycle,
+        file: mockFile
+      });
+
+      setNotification({
+        message: result.message,
+        type: 'success'
+      });
+
+      // Reset form after successful upload
+      setMetadata({
+        title: '',
+        description: '',
+        category: '',
+        complianceFramework: '',
+        effectiveDate: '',
+        reviewCycle: '',
+      });
+      setUploadedFiles([]);
+
+      // Navigate back to policy list after a short delay
+      setTimeout(() => {
+        navigate('/policies');
+      }, 2000);
+
+    } catch (error: unknown) {
+      setNotification({
+        message: error instanceof Error ? error.message : 'Failed to upload policy. Please try again.',
+        type: 'error'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Notification */}
+      {notification && (
+        <div className={`p-4 rounded-md ${
+          notification.type === 'success' 
+            ? 'bg-green-50 text-green-700 border border-green-200' 
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Upload Policy</h1>
           <p className="text-slate-600 mt-1">Add new policy documents to your compliance framework</p>
         </div>
-        <Button onClick={() => window.history.back()}>
+        <Button onClick={() => navigate('/policies')}>
           ← Back to Policies
         </Button>
       </div>
@@ -370,12 +436,18 @@ function PolicyUpload() {
 
         {/* Submit Button */}
         <div className="flex justify-end space-x-3">
-          <Button type="button" variant="outline" onClick={() => window.history.back()}>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => navigate('/policies')}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
           <Button 
             type="submit" 
-            disabled={!metadata.title || !metadata.category || uploadedFiles.length === 0}
+            isLoading={isSubmitting}
+            disabled={!metadata.title || !metadata.category || uploadedFiles.length === 0 || isSubmitting}
           >
             Create Policy
           </Button>

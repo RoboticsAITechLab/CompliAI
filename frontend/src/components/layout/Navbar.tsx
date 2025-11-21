@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
 
 const Navbar: React.FC = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { user, logout, getDisplayName } = useAuthStore();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -21,15 +25,15 @@ const Navbar: React.FC = () => {
     };
   }, [isUserMenuOpen]);
 
-  // TODO: Replace with actual user data from auth store
-  const user = {
-    name: 'Ankit',
-    organization: 'MyCompany'
-  };
-
-  const handleLogout = () => {
-    // TODO: Implement logout logic
-    console.log('Logout clicked');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force navigation even if logout request fails
+      navigate('/login');
+    }
   };
 
   return (
@@ -45,7 +49,7 @@ const Navbar: React.FC = () => {
           {/* Organization */}
           <div className="hidden md:flex items-center text-sm text-gray-600">
             <span className="font-medium">Org:</span>
-            <span className="ml-1 font-semibold text-gray-900">{user.organization}</span>
+            <span className="ml-1 font-semibold text-gray-900">{user?.org || 'CompliAI'}</span>
           </div>
 
           {/* User Dropdown */}
@@ -55,7 +59,7 @@ const Navbar: React.FC = () => {
               className="flex items-center space-x-2 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2"
             >
               <span>User ▾</span>
-              <span className="text-gray-900">({user.name})</span>
+              <span className="text-gray-900">({getDisplayName()})</span>
             </button>
 
             {/* Dropdown Menu */}
@@ -64,7 +68,7 @@ const Navbar: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsUserMenuOpen(false);
-                    // TODO: Navigate to profile
+                    navigate('/profile');
                   }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
@@ -73,7 +77,7 @@ const Navbar: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsUserMenuOpen(false);
-                    // TODO: Navigate to settings
+                    navigate('/settings');
                   }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >

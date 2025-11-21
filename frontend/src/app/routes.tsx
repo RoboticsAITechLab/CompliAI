@@ -2,11 +2,28 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import { Button, Card, Badge, Spinner } from '../components/ui';
+import { useAuthStore } from '../store/authStore';
 
 // Auth Components
 import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import ForgotPassword from '../pages/auth/ForgotPassword';
+import VerifyEmail from '../pages/auth/VerifyEmail';
+import ResetPasswordPage from '../pages/auth/ResetPassword';
+import VerifyOTP from '../pages/auth/VerifyOTP';
+import TwoFactorLogin from '../pages/auth/TwoFactorLogin';
+import ChangePassword from '../pages/auth/ChangePassword';
+import TwoFactorSetup from '../pages/auth/TwoFactorSetup';
+import AccountLockout from '../pages/auth/AccountLockout';
+import Disable2FA from '../pages/auth/Disable2FA';
+import SessionExpired from '../pages/auth/SessionExpired';
+import RecoveryCodes from '../pages/auth/RecoveryCodes';
+import ActiveSessions from '../pages/auth/ActiveSessions';
+import VerifyEmailPending from '../pages/auth/VerifyEmailPending';
+import EmailVerificationCenter from '../pages/auth/EmailVerificationCenter';
+import SecurityLogs from '../pages/auth/SecurityLogs';
+import DeviceManagement from '../pages/auth/DeviceManagement';
+import EmergencyRecovery from '../pages/auth/EmergencyRecovery';
 
 // Error Components  
 import NotFound from '../pages/errors/NotFound';
@@ -19,6 +36,11 @@ import PolicyUpload from '../pages/policies/PolicyUpload';
 import ControlsPage from '../pages/controls/Controls';
 import ReportsPage from '../pages/reports/Reports';
 import SettingsPage from '../pages/settings/Settings';
+import ProfilePage from '../pages/profile/Profile';
+import BillingOverview from '../pages/billing/BillingOverview';
+import PlanComparison from '../pages/billing/PlanComparison';
+import Invoices from '../pages/billing/Invoices';
+import AuthDebug from '../pages/debug/AuthDebug';
 
 // Enhanced placeholder components demonstrating UI components
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -66,8 +88,7 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 );
 
 const AppRoutes: React.FC = () => {
-  // TODO: Replace with actual auth check from authStore
-  const isAuthenticated = false; // Authentication restored
+  const { isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated) {
     return (
@@ -75,6 +96,15 @@ const AppRoutes: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/verify-otp" element={<VerifyOTP />} />
+        <Route path="/2fa-login" element={<TwoFactorLogin />} />
+        <Route path="/account-locked" element={<AccountLockout />} />
+        <Route path="/session-expired" element={<SessionExpired />} />
+        <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
+        <Route path="/email-verification" element={<EmailVerificationCenter />} />
+        <Route path="/emergency-recovery" element={<EmergencyRecovery />} />
         <Route path="/access-denied" element={<AccessDenied />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
@@ -99,8 +129,30 @@ const AppRoutes: React.FC = () => {
         {/* Reports */}
         <Route path="/reports" element={<ReportsPage />} />
         
+        {/* Billing */}
+        <Route path="/billing" element={<BillingOverview />} />
+        <Route path="/billing/plans" element={<PlanComparison />} />
+        <Route path="/billing/invoices" element={<Invoices />} />
+        
         {/* Settings */}
         <Route path="/settings" element={<SettingsPage />} />
+        
+        {/* Profile */}
+        <Route path="/profile" element={<ProfilePage />} />
+        
+        {/* Security/Auth Settings */}
+        <Route path="/change-password" element={<ChangePassword />} />
+        <Route path="/setup-2fa" element={<TwoFactorSetup />} />
+        <Route path="/disable-2fa" element={<Disable2FA />} />
+        <Route path="/recovery-codes" element={<RecoveryCodes />} />
+        <Route path="/active-sessions" element={<ActiveSessions />} />
+        <Route path="/security-logs" element={<SecurityLogs />} />
+        <Route path="/device-management" element={<DeviceManagement />} />
+        <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
+        <Route path="/email-verification" element={<EmailVerificationCenter />} />
+        
+        {/* Debug (Development only) */}
+        <Route path="/auth-debug" element={<AuthDebug />} />
         
         {/* Error Pages */}
         <Route path="/access-denied" element={<AccessDenied />} />

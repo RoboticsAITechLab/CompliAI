@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input, Card } from '../../components/ui';
+import { authService, AUTH_ERROR_CODES } from '../../services/authService';
+import { validateRegisterForm, normalizeAuthData, type RegisterValidationErrors } from '../../utils/validation';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -12,7 +14,7 @@ const Register: React.FC = () => {
     organization: ''
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<RegisterValidationErrors>({});
   
   const navigate = useNavigate();
 
@@ -31,30 +33,16 @@ const Register: React.FC = () => {
   };
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.firstName) newErrors.firstName = 'First name is required';
-    if (!formData.lastName) newErrors.lastName = 'Last name is required';
-    if (!formData.organization) newErrors.organization = 'Organization is required';
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const validationErrors = validateRegisterForm(
+      formData.firstName,
+      formData.lastName,
+      formData.email,
+      formData.password,
+      formData.confirmPassword,
+      formData.organization
+    );
+    setErrors(validationErrors);
+    return Object.keys(validationErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,23 +53,44 @@ const Register: React.FC = () => {
     }
 
     setIsLoading(true);
+    setErrors({});
     
     try {
-      // TODO: Replace with actual auth service call
-      console.log('Registration attempt:', formData);
+      const registerData = {
+        email: normalizeAuthData.email(formData.email),
+        password: formData.password,
+        firstName: normalizeAuthData.name(formData.firstName),
+        lastName: normalizeAuthData.name(formData.lastName),
+        org: normalizeAuthData.org(formData.organization)
+      };
+
+      await authService.register(registerData);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Registration successful - redirect to email verification pending page
+      navigate(`/email-verification?email=${encodeURIComponent(registerData.email)}&method=email_link`);
       
-      // Mock successful registration
-      console.log('Registration successful');
-      
-      // Redirect to login with success message
-      navigate('/login');
-      
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Registration failed:', error);
-      setErrors({ email: 'Registration failed. Please try again.' });
+      
+      if (error && typeof error === 'object' && 'code' in error) {
+        const authError = error as { code: string; message: string };
+        
+        switch (authError.code) {
+          case AUTH_ERROR_CODES.CONFLICT:
+            setErrors({ email: 'An account with this email already exists. Please sign in instead.' });
+            break;
+          case AUTH_ERROR_CODES.VALIDATION_ERROR:
+            setErrors({ submit: authError.message });
+            break;
+          case AUTH_ERROR_CODES.TOO_MANY_REQUESTS:
+            setErrors({ submit: 'Too many registration attempts. Please wait a moment before trying again.' });
+            break;
+          default:
+            setErrors({ submit: authError.message || 'Registration failed. Please try again.' });
+        }
+      } else {
+        setErrors({ submit: 'Registration failed. Please check your connection and try again.' });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -183,6 +192,31 @@ const Register: React.FC = () => {
               required
             />
 
+            {/* General Error Display */}
+            {errors.submit && (
+              <div className="rounded-md bg-red-50 p-4">
+                <div className="flex">
+                  <svg
+                    className="h-5 w-5 text-red-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">
+                      {errors.submit}
+                    </h3>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="pt-4 space-y-4">
               <Button
@@ -211,7 +245,7 @@ const Register: React.FC = () => {
       {/* Footer */}
       <div className="mt-8 text-center">
         <p className="text-xs text-gray-500">
-          © 2024 CompliAI. All rights reserved.
+          © {new Date().getFullYear()} CompliAI. All rights reserved.
         </p>
       </div>
     </div>
